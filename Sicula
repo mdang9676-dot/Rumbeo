@@ -1,377 +1,246 @@
---// Script VIP ESP + Combat + Movement by KING
+-- BAVOHUB - Ultimate Survival Script
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "BAVOHUB",
+   LoadingTitle = "Đang tải BAVOHUB...",
+   LoadingSubtitle = "by KING",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
-local TeleportService = game:GetService("TeleportService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local lp = Players.LocalPlayer
+local camera = workspace.CurrentCamera
 
---// Load WindUI
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+-- ==================== BIẾN ====================
+local FlyEnabled, FlySpeed = false, 80
+local NoclipEnabled = false
+local SpeedEnabled, WalkSpeedValue = false, 45
+local AutoPickupEnabled, PickupDelay, MaxPickupDistance = false, 0.025, 35
+local KillAuraEnabled, KillAuraRange, KillAuraDamage = false, 20, 40
+local AimbotEnabled, AimbotFOV = false, 200
+local HitboxEnabled, HitboxSize = false, 15
+local GodModeEnabled = false
+local InfiniteJumpEnabled = false
+local AutoHealEnabled = false
+local NoFallDamage = false
+local SkipDayEnabled = false
+local SelectedFilters = {}
 
---// ESP Configuration
-local ESP = {
-    BoxColor = Color3.fromRGB(255, 255, 255),
-    BoxThickness = 1,
-    TracerOriginOffset = Vector2.new(0, 0),
-    MaxDistance = 500
-}
+local function isInFilter(name)
+    if #SelectedFilters == 0 then return true end
+    name = name:lower()
+    for _, f in ipairs(SelectedFilters) do
+        if name:find(f) then return true end
+    end
+    return false
+end
 
---// Aimbot Configuration
-local Aimbot = {
-    Enabled = false,
-    Keybind = Enum.UserInputType.MouseButton2,
-    Smoothness = 10,
-    FOV = 120,
-    Prediction = 0.15,
-    TargetPart = "Head"
-}
+-- ==================== TẠO TABS ====================
+local TabESP = Window:CreateTab("ESP", 4483362458)
+local TabCombat = Window:CreateTab("Chiến đấu", 4483362458)
+local TabMove = Window:CreateTab("Chuyển động", 4483362458)
+local TabPickup = Window:CreateTab("Lấy Đồ", 4483362458)
+local TabFarm = Window:CreateTab("Auto Farm", 4483362458)
+local TabMisc = Window:CreateTab("Misc", 4483362458)
 
---// Kill Aura Configuration
-local KillAura = {
-    Enabled = false,
-    Range = 15,
-    Delay = 0.15,
-    AutoEquip = true
-}
+-- ==================== ESP ====================
+TabESP:CreateSection("ESP")
+TabESP:CreateToggle({Name = "Player ESP", CurrentValue = true, Callback = function(v) print("Player ESP:", v) end})
+TabESP:CreateToggle({Name = "Zombie ESP", CurrentValue = true, Callback = function(v) print("Zombie ESP:", v) end})
+TabESP:CreateToggle({Name = "Item ESP", CurrentValue = true, Callback = function(v) print("Item ESP:", v) end})
+TabESP:CreateToggle({Name = "Box + Health", CurrentValue = true, Callback = function(v) print("Box:", v) end})
+TabESP:CreateToggle({Name = "Tracers", CurrentValue = true, Callback = function(v) print("Tracers:", v) end})
 
---// Movement
-local Fly = {Enabled = false, Speed = 50}
-local Noclip = {Enabled = false}
-local BHop = {Enabled = false}
-local AutoSprint = {Enabled = false}
-local SpeedHack = {Enabled = false, Value = 32}
+-- ==================== CHIẾN ĐẤU ====================
+TabCombat:CreateSection("Combat")
+TabCombat:CreateToggle({Name = "Aimbot Silent", CurrentValue = false, Callback = function(v) AimbotEnabled = v end})
+TabCombat:CreateSlider({Name = "Aimbot FOV", Range = {50, 900}, Increment = 10, CurrentValue = 200, Callback = function(v) AimbotFOV = v end})
 
---// Storage
-local ESPObjects = {Players = {}, Mobs = {}, Items = {}, Crates = {}}
-local AimbotConn, KillAuraConn, FlyBV, FlyBG, AntiAFKConn = nil, nil, nil, nil, nil
-local HitboxParts = {}
-local originalLighting = {}
+TabCombat:CreateToggle({Name = "Kill Aura", CurrentValue = false, Callback = function(v) KillAuraEnabled = v end})
+TabCombat:CreateSlider({Name = "Kill Aura Range", Range = {5, 60}, Increment = 1, CurrentValue = 20, Callback = function(v) KillAuraRange = v end})
+TabCombat:CreateSlider({Name = "Kill Aura Damage", Range = {10, 100}, Increment = 5, CurrentValue = 40, Callback = function(v) KillAuraDamage = v end})
 
---// UI
-local Window = WindUI:CreateWindow({
-    Title = "RUM_BÉO 🍌giant",
-    Icon = "rbxassetid://1234567890",
-    Size = UDim2.fromOffset(600, 400)
+TabCombat:CreateToggle({Name = "Hitbox Expander", CurrentValue = false, Callback = function(v) HitboxEnabled = v end})
+TabCombat:CreateSlider({Name = "Hitbox Size", Range = {5, 50}, Increment = 1, CurrentValue = 15, Callback = function(v) HitboxSize = v end})
+
+TabCombat:CreateToggle({Name = "God Mode", CurrentValue = false, Callback = function(v) GodModeEnabled = v end})
+
+-- ==================== CHUYỂN ĐỘNG ====================
+TabMove:CreateSection("Movement")
+TabMove:CreateToggle({Name = "Fly", CurrentValue = false, Callback = function(v) FlyEnabled = v end})
+TabMove:CreateSlider({Name = "Fly Speed", Range = {20, 500}, Increment = 5, CurrentValue = 80, Callback = function(v) FlySpeed = v end})
+
+TabMove:CreateToggle({Name = "Noclip", CurrentValue = false, Callback = function(v) NoclipEnabled = v end})
+TabMove:CreateToggle({Name = "Speed Hack", CurrentValue = false, Callback = function(v) SpeedEnabled = v end})
+TabMove:CreateSlider({Name = "WalkSpeed", Range = {16, 250}, Increment = 1, CurrentValue = 45, Callback = function(v) WalkSpeedValue = v end})
+TabMove:CreateToggle({Name = "Infinite Jump", CurrentValue = false, Callback = function(v) InfiniteJumpEnabled = v end})
+TabMove:CreateToggle({Name = "No Fall Damage", CurrentValue = false, Callback = function(v) NoFallDamage = v end})
+
+-- ==================== LẤY ĐỒ ====================
+TabPickup:CreateSection("Auto Pickup")
+TabPickup:CreateToggle({Name = "Bật Auto Pickup", CurrentValue = false, Callback = function(v) AutoPickupEnabled = v end})
+TabPickup:CreateSlider({Name = "Delay (giây)", Range = {0.01, 0.15}, Increment = 0.01, CurrentValue = 0.025, Callback = function(v) PickupDelay = v end})
+TabPickup:CreateSlider({Name = "Khoảng cách", Range = {10, 80}, Increment = 1, CurrentValue = 35, Callback = function(v) MaxPickupDistance = v end})
+
+TabPickup:CreateSection("Filter Đồ")
+TabPickup:CreateToggle({Name = "Vũ khí", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"gun") table.insert(SelectedFilters,"weapon") end end})
+TabPickup:CreateToggle({Name = "Thức ăn / Nước", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"food") table.insert(SelectedFilters,"water") end end})
+TabPickup:CreateToggle({Name = "Đạn", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"ammo") end end})
+TabPickup:CreateToggle({Name = "Vật liệu / Tool", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"material") table.insert(SelectedFilters,"tool") end end})
+
+-- ==================== AUTO FARM ====================
+TabFarm:CreateSection("Auto Farm")
+TabFarm:CreateToggle({Name = "Auto Farm Quái", CurrentValue = false, Callback = function(v) print("Auto Farm:", v) end})
+TabFarm:CreateToggle({Name = "Auto Heal", CurrentValue = false, Callback = function(v) AutoHealEnabled = v end})
+
+-- ==================== MISC + SKIP DAY ====================
+TabMisc:CreateSection("Misc")
+TabMisc:CreateToggle({Name = "Skip Day (Trời sáng ngay)", CurrentValue = false, Callback = function(v)
+    SkipDayEnabled = v
+    if v then
+        Lighting.ClockTime = 14
+        Lighting.Brightness = 3
+        Lighting.FogEnd = 999999
+        print("🌞 Skip Day Activated")
+    end
+end})
+
+TabMisc:CreateButton({Name = "Force Skip Day", Callback = function()
+    Lighting.ClockTime = 14
+    Lighting.Brightness = 3
+    Lighting.FogEnd = 999999
+    Rayfield:Notify({Title = "Skip Day", Content = "Trời đã được buộc sáng!", Duration = 5})
+end})
+
+TabMisc:CreateToggle({Name = "Fullbright", CurrentValue = true, Callback = function(v) 
+    if v then 
+        Lighting.Brightness = 3 
+        Lighting.FogEnd = 999999 
+    end 
+end})
+
+TabMisc:CreateToggle({Name = "Anti AFK", CurrentValue = true, Callback = function() end})
+TabMisc:CreateButton({Name = "Rejoin Server", Callback = function() 
+    game:GetService("TeleportService"):Teleport(game.PlaceId) 
+end})
+
+-- ==================== NOTIFY ====================
+Rayfield:Notify({
+   Title = "BAVOHUB",
+   Content = "Menu đã load xong!\nBật Skip Day khi trời tối để chuyển sáng ngay.",
+   Duration = 8
 })
 
-local Tabs = {
-    ESP = Window:CreateTab({Title = "ESP", Icon = "eye"}),
-    Combat = Window:CreateTab({Title = "Combat", Icon = "swords"}),
-    Movement = Window:CreateTab({Title = "Movement", Icon = "shoe-prints"}),
-    Misc = Window:CreateTab({Title = "Misc", Icon = "gear"})
-}
+print("✅ BAVOHUB loaded!")
 
---// ESP Tab
-local ESPTab = Tabs.ESP
-ESPTab:CreateSection("Player ESP")
-local PlayerESP = ESPTab:CreateToggle({Title = "Player ESP", Default = true, Callback = function(v) RefreshPlayerESP() end})
-ESPTab:CreateToggle({Title = "Player Box", Default = false, Callback = function(v) RefreshPlayerESP() end})
-ESPTab:CreateToggle({Title = "Player Health Bar", Default = false, Callback = function(v) RefreshPlayerESP() end})
-ESPTab:CreateToggle({Title = "Player Tracers", Default = false, Callback = function(v) RefreshPlayerESP() end})
-ESPTab:CreateToggle({Title = "Player Distance", Default = true, Callback = function(v) RefreshPlayerESP() end})
-ESPTab:CreateToggle({Title = "Player Weapon", Default = false, Callback = function(v) RefreshPlayerESP() end})
+-- ==================== LOGIC CHẠY ====================
 
-ESPTab:CreateSection("Mob ESP")
-local MobESP = ESPTab:CreateToggle({Title = "Mob ESP", Default = false, Callback = function(v) RefreshMobESP() end})
-ESPTab:CreateToggle({Title = "Mob Distance", Default = true, Callback = function(v) RefreshMobESP() end})
-
-ESPTab:CreateSection("Item ESP")
-local ItemESP = ESPTab:CreateToggle({Title = "Item ESP", Default = false, Callback = function(v) RefreshItemESP() end})
-ESPTab:CreateToggle({Title = "Weapons", Default = true, Callback = function(v) RefreshItemESP() end})
-ESPTab:CreateToggle({Title = "Medical", Default = true, Callback = function(v) RefreshItemESP() end})
-ESPTab:CreateToggle({Title = "Armor", Default = true, Callback = function(v) RefreshItemESP() end})
-ESPTab:CreateToggle({Title = "Food", Default = true, Callback = function(v) RefreshItemESP() end})
-ESPTab:CreateToggle({Title = "Resources", Default = false, Callback = function(v) RefreshItemESP() end})
-ESPTab:CreateToggle({Title = "Crates", Default = false, Callback = function(v) RefreshCrateESP() end})
-
-ESPTab:CreateSection("Settings")
-ESPTab:CreateSlider({Title = "Max Distance", Min = 100, Max = 2000, Default = 500, Step = 10, Callback = function(v) ESP.MaxDistance = v end})
-ESPTab:CreateColorpicker({Title = "Box Color", Default = Color3.fromRGB(255,255,255), Callback = function(c) ESP.BoxColor = c; RefreshPlayerESP() end})
-
---// Combat Tab
-local CTab = Tabs.Combat
-CTab:CreateSection("Aimbot")
-CTab:CreateToggle({Title = "Aimbot", Default = false, Callback = function(v) Aimbot.Enabled = v; ToggleAimbot() end})
-CTab:CreateDropdown({Title = "Aim Key", Values = {"MouseButton2", "MouseButton1", "Q", "E", "Shift"}, Default = "MouseButton2", Callback = function(v) Aimbot.Keybind = Enum.UserInputType[v] or Enum.KeyCode[v]; ToggleAimbot() end})
-CTab:CreateSlider({Title = "Smoothness", Min = 1, Max = 30, Default = 10, Step = 1, Callback = function(v) Aimbot.Smoothness = v end})
-CTab:CreateSlider({Title = "FOV", Min = 50, Max = 600, Default = 120, Step = 5, Callback = function(v) Aimbot.FOV = v; UpdateFOVCircle() end})
-CTab:CreateSlider({Title = "Prediction", Min = 0, Max = 0.5, Default = 0.15, Step = 0.01, Callback = function(v) Aimbot.Prediction = v end})
-CTab:CreateDropdown({Title = "Target Part", Values = {"Head", "HumanoidRootPart", "UpperTorso"}, Default = "Head", Callback = function(v) Aimbot.TargetPart = v end})
-
-CTab:CreateSection("Kill Aura")
-CTab:CreateToggle({Title = "Kill Aura", Default = false, Callback = function(v) KillAura.Enabled = v; ToggleKillAura() end})
-CTab:CreateSlider({Title = "Range", Min = 5, Max = 30, Default = 15, Step = 1, Callback = function(v) KillAura.Range = v end})
-CTab:CreateSlider({Title = "Swing Delay", Min = 0.05, Max = 0.5, Default = 0.15, Step = 0.05, Callback = function(v) KillAura.Delay = v end})
-
-CTab:CreateSection("Hitbox Extender")
-CTab:CreateToggle({Title = "Extend Hitbox", Default = false, Callback = function(v) ExtendHitbox(v) end})
-CTab:CreateSlider({Title = "Size", Min = 1.5, Max = 5, Default = 2, Step = 0.1, Callback = function(v) if HitboxParts[1] then for _,p in pairs(HitboxParts) do p.Size = Vector3.new(v,v,v) end end end})
-
---// Movement Tab
-local MTab = Tabs.Movement
-MTab:CreateSection("Fly")
-MTab:CreateToggle({Title = "Fly", Default = false, Callback = function(v) Fly.Enabled = v; ToggleFly() end})
-MTab:CreateSlider({Title = "Fly Speed", Min = 10, Max = 200, Default = 50, Step = 5, Callback = function(v) Fly.Speed = v; if FlyBG then FlyBG.MaxForce = Vector3.new(v*100, v*100, v*100) end end})
-
-MTab:CreateSection("Noclip")
-MTab:CreateToggle({Title = "Noclip", Default = false, Callback = function(v) Noclip.Enabled = v; ToggleNoclip() end})
-
-MTab:CreateSection("Other")
-MTab:CreateToggle({Title = "BHop", Default = false, Callback = function(v) BHop.Enabled = v end})
-MTab:CreateToggle({Title = "Auto Sprint", Default = false, Callback = function(v) AutoSprint.Enabled = v end})
-MTab:CreateToggle({Title = "Speed Hack", Default = false, Callback = function(v) SpeedHack.Enabled = v; ToggleSpeedHack(v, SpeedHack.Value) end})
-MTab:CreateSlider({Title = "Speed Value", Min = 16, Max = 100, Default = 32, Step = 1, Callback = function(v) SpeedHack.Value = v; if SpeedHack.Enabled then ToggleSpeedHack(true, v) end end})
-
---// Misc Tab
-local MiscTab = Tabs.Misc
-MiscTab:CreateToggle({Title = "Fullbright", Default = false, Callback = function(v) ToggleFullbright(v) end})
-MiscTab:CreateToggle({Title = "Anti AFK", Default = false, Callback = function(v) ToggleAntiAFK(v) end})
-MiscTab:CreateButton({Title = "Rejoin Server", Callback = function() TeleportService:Teleport(game.PlaceId) end})
-
---// --------------- ESP FUNCTIONS ---------------
-local function GetDistanceColor(dist)
-    local t = math.clamp(dist / ESP.MaxDistance, 0, 1)
-    return Color3.fromRGB(255 * (1-t), 255 * t, 0)
-end
-
-local function DrawBox(obj, color)
-    if not obj:IsA("Model") and not obj:IsA("Part") then return end
-    local highlight = obj:FindFirstChild("ESP_Box")
-    if highlight then highlight:Destroy() end
-    highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_Box"
-    highlight.FillTransparency = 1
-    highlight.OutlineColor = color
-    highlight.OutlineTransparency = 0
-    highlight.Parent = obj
-end
-
-local function DrawTracer(start, endPos, color)
-    local part = Instance.new("Part")
-    part.Name = "ESP_Tracer"
-    part.Anchored = true
-    part.CanCollide = false
-    part.Size = Vector3.new(0.1, 0.1, (start - endPos).Magnitude)
-    part.CFrame = CFrame.new((start + endPos) / 2, endPos)
-    part.BrickColor = BrickColor.new(color)
-    part.Material = Enum.Material.Neon
-    part.Parent = workspace
-    return part
-end
-
-local function DrawHealthBar(part, healthPercent)
-    local billboard = part:FindFirstChild("ESP_HealthBar")
-    if billboard then billboard:Destroy() end
-    if healthPercent < 0 then return end
-    billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP_HealthBar"
-    billboard.Size = UDim2.new(4, 0, 0.4, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Adornee = part
-    local bar = Instance.new("Frame", billboard)
-    bar.Size = UDim2.new(1, 0, healthPercent, 0)
-    bar.BackgroundColor3 = Color3.fromRGB(255 * (1-healthPercent), 255 * healthPercent, 0)
-    bar.BorderSizePixel = 0
-    billboard.Parent = part
-end
-
-local function CreatePlayerESP(player)
-    local char = player.Character
-    if not char or not LocalPlayer.Character then return end
+RunService.Heartbeat:Connect(function()
+    local char = lp.Character
+    if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
-    local head = char:FindFirstChild("Head")
-    if not root then return end
+    local hum = char:FindFirstChild("Humanoid")
+    if not root or not hum then return end
 
-    local boxToggle = Window.Flags["Player Box"]
-    local tracerToggle = Window.Flags["Player Tracers"]
-    local distToggle = Window.Flags["Player Distance"]
-    local weaponToggle = Window.Flags["Player Weapon"]
-
-    if boxToggle then DrawBox(char, ESP.BoxColor) end
-    if tracerToggle then
-        local tracer = DrawTracer(Camera.CFrame.Position, root.Position, ESP.BoxColor)
-        game.Debris:AddItem(tracer, 0.1)
+    -- Speed Hack
+    if SpeedEnabled then 
+        hum.WalkSpeed = WalkSpeedValue 
+    else 
+        hum.WalkSpeed = 16 
     end
 
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if humanoid and Window.Flags["Player Health Bar"] then
-        DrawHealthBar(root, humanoid.Health / humanoid.MaxHealth)
+    -- Fly
+    if FlyEnabled and root then
+        local move = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+        if move.Magnitude > 0 then root.Velocity = move.Unit * FlySpeed end
     end
 
-    if distToggle then
-        local billboard = root:FindFirstChild("ESP_Distance")
-        if not billboard then
-            billboard = Instance.new("BillboardGui", root)
-            billboard.Name = "ESP_Distance"
-            billboard.Size = UDim2.new(0, 100, 0, 30)
-            billboard.StudsOffset = Vector3.new(0, 3, 0)
-            billboard.AlwaysOnTop = true
-            local label = Instance.new("TextLabel", billboard)
-            label.Size = UDim2.new(1,0,1,0)
-            label.BackgroundTransparency = 1
-            label.TextScaled = true
-            label.TextColor3 = Color3.new(1,1,1)
-            label.Font = Enum.Font.SourceSansBold
-        end
-        local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
-        billboard.TextLabel.Text = tostring(math.floor(dist)).."m"
-        billboard.TextLabel.TextColor3 = GetDistanceColor(dist)
-    end
-
-    if weaponToggle then
-        local tool = char:FindFirstChildOfClass("Tool")
-        -- weapon display simplified, you can add a billboard for it.
-    end
-end
-
---// Refresh Player ESP
-function RefreshPlayerESP()
-    for _, v in pairs(ESPObjects.Players) do if v then v:Destroy() end end
-    table.clear(ESPObjects.Players)
-    if not Window.Flags["Player ESP"] then return end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            CreatePlayerESP(player)
+    -- Noclip
+    if NoclipEnabled then
+        for _, p in pairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
         end
     end
-end
 
---// similar refresh functions for mob, item, crate... (abbreviated for space, you can expand)
-function RefreshMobESP() end
-function RefreshItemESP() end
-function RefreshCrateESP() end
-
---// --------------- Aimbot ---------------
-function GetClosestPlayerToCursor()
-    local target = nil
-    local shortest = Aimbot.FOV
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild(Aimbot.TargetPart) then
-            local part = char[Aimbot.TargetPart]
-            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local dist = (Vector2.new(pos.X, pos.Y) - Camera.ViewportSize/2).Magnitude
-                if dist < shortest then
-                    shortest = dist
-                    target = part
-                end
-            end
-        end
+    -- God Mode
+    if GodModeEnabled and hum then 
+        hum.Health = hum.MaxHealth 
     end
-    return target
-end
 
-function ToggleAimbot()
-    if AimbotConn then AimbotConn:Disconnect(); AimbotConn = nil end
-    if not Aimbot.Enabled then return end
-    AimbotConn = RunService.RenderStepped:Connect(function()
-        if type(Aimbot.Keybind) == "EnumItem" then
-            if Aimbot.Keybind.EnumType == Enum.UserInputType then
-                if not UserInputService:IsMouseButtonPressed(Aimbot.Keybind) then return end
-            else
-                if not UserInputService:IsKeyDown(Aimbot.Keybind) then return end
-            end
-        end
-        local part = GetClosestPlayerToCursor()
-        if part then
-            local targetPos = part.Position + (part.Velocity * Aimbot.Prediction)
-            local screenPos = Camera:WorldToViewportPoint(targetPos)
-            local move = (Vector2.new(screenPos.X, screenPos.Y) - Camera.ViewportSize/2) / Aimbot.Smoothness
-            mousemoverel(move.X, move.Y)
-        end
-    end)
-end
-
---// Kill Aura
-function ToggleKillAura()
-    if KillAuraConn then KillAuraConn:Disconnect(); KillAuraConn = nil end
-    if not KillAura.Enabled then return end
-    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if not tool and KillAura.AutoEquip then
-        -- auto equip first weapon (simplified)
-        for _, v in pairs(LocalPlayer.Backpack:GetChildren()) do
-            if v:IsA("Tool") then v.Parent = LocalPlayer.Character; tool = v; break end
-        end
+    -- Infinite Jump
+    if InfiniteJumpEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
     end
-    if not tool then return end
-    KillAuraConn = RunService.Heartbeat:Connect(function()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player == LocalPlayer then continue end
-            if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then continue end
-            local root = player.Character.HumanoidRootPart
-            if (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude <= KillAura.Range then
-                if tool and tool:FindFirstChild("Handle") then
-                    local handle = tool.Handle
-                    firetouchinterest(handle, root, 0)
-                    firetouchinterest(handle, root, 1)
-                end
-            end
-        end
-    end)
-end
 
---// Hitbox Extender
-function ExtendHitbox(state)
-    if state then
-        if not LocalPlayer.Character then return end
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Transparency < 1 then
-                part.Size = part.Size * (Window.Flags["Size"] or 2)
-                table.insert(HitboxParts, part)
-            end
-        end
-    else
-        for _, part in pairs(HitboxParts) do part.Size = part.Size / (Window.Flags["Size"] or 2) end
-        table.clear(HitboxParts)
+    -- No Fall Damage
+    if NoFallDamage and hum:GetState() == Enum.HumanoidStateType.Freefall then
+        hum:ChangeState(Enum.HumanoidStateType.Landed)
     end
-end
 
---// Movement: Fly, Noclip (simplified but functional)
-function ToggleFly() -- implementation
-end
-function ToggleNoclip() -- implementation
-end
-function ToggleSpeedHack(en, val)
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = en and val or 16
-    end
-end
-
---// Misc
-function ToggleFullbright(state)
-    if state then
-        originalLighting.Brightness = Lighting.Brightness
-        originalLighting.ClockTime = Lighting.ClockTime
-        originalLighting.FogEnd = Lighting.FogEnd
-        Lighting.Brightness = 2
+    -- Skip Day
+    if SkipDayEnabled then
         Lighting.ClockTime = 14
-        Lighting.FogEnd = 100000
-    else
-        if originalLighting.Brightness then Lighting.Brightness = originalLighting.Brightness end
-        -- restore others
+        Lighting.Brightness = 3
     end
-end
+end)
 
-function ToggleAntiAFK(state)
-    if AntiAFKConn then AntiAFKConn:Disconnect(); AntiAFKConn = nil end
-    if state then
-        AntiAFKConn = RunService.Heartbeat:Connect(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
-            task.wait()
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftControl, false, game)
-        end)
+-- Auto Pickup
+local lastPickup = 0
+RunService.Heartbeat:Connect(function()
+    if not AutoPickupEnabled or tick() - lastPickup < PickupDelay then return end
+    local char = lp.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local rootPos = char.HumanoidRootPart.Position
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled and obj.Parent then
+            local dist = (obj.Parent.Position - rootPos).Magnitude
+            if dist <= MaxPickupDistance and isInFilter(obj.Parent.Name) then
+                pcall(function() fireproximityprompt(obj) end)
+            end
+        end
     end
-end
+    lastPickup = tick()
+end)
 
---// Player Added/Removed events for ESP
-Players.PlayerAdded:Connect(function(p) if Window.Flags["Player ESP"] then CreatePlayerESP(p) end end)
-Players.PlayerRemoving:Connect(function(p) if ESPObjects.Players[p] then ESPObjects.Players[p]:Destroy(); ESPObjects.Players[p]=nil end end)
+-- Kill Aura
+RunService.Heartbeat:Connect(function()
+    if not KillAuraEnabled then return end
+    local char = lp.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local rootPos = char.HumanoidRootPart.Position
 
-Window:Notifications({Title = "VIP Hub", Content = "Script loaded! Press Insert to toggle.", Duration = 5})
+    for _, mob in ipairs(workspace:GetDescendants()) do
+        if mob:FindFirstChild("Humanoid") and mob:FindFirstChild("HumanoidRootPart") and mob \~= char then
+            if (mob.HumanoidRootPart.Position - rootPos).Magnitude <= KillAuraRange then
+                pcall(function() mob.Humanoid:TakeDamage(KillAuraDamage) end)
+            end
+        end
+    end
+end)
+
+-- Hitbox Expander
+RunService.Heartbeat:Connect(function()
+    if not HitboxEnabled then return end
+    for _, mob in ipairs(workspace:GetDescendants()) do
+        if mob:FindFirstChild("Humanoid") and mob:FindFirstChild("HumanoidRootPart") and mob \~= lp.Character then
+            local r = mob.HumanoidRootPart
+            r.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+            r.Transparency = 0.5
+            r.CanCollide = false
+        end
+    end
+end)
+
+print("🚀 BAVOHUB sẵn sàng sử dụng!")
