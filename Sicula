@@ -1,246 +1,304 @@
--- BAVOHUB - Ultimate Survival Script
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Script: GREEMOSS-by KING
+-- Game: Jujutsu Roblox
+-- Tạo bởi: KING
 
-local Window = Rayfield:CreateWindow({
-   Name = "BAVOHUB",
-   LoadingTitle = "Đang tải BAVOHUB...",
-   LoadingSubtitle = "by KING",
-   ConfigurationSaving = { Enabled = false },
-   KeySystem = false
-})
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+local players = game:GetService("Players")
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local lp = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+-- Tạo GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GREEMOSS_GUI"
+screenGui.Parent = player:PlayerGui
 
--- ==================== BIẾN ====================
-local FlyEnabled, FlySpeed = false, 80
-local NoclipEnabled = false
-local SpeedEnabled, WalkSpeedValue = false, 45
-local AutoPickupEnabled, PickupDelay, MaxPickupDistance = false, 0.025, 35
-local KillAuraEnabled, KillAuraRange, KillAuraDamage = false, 20, 40
-local AimbotEnabled, AimbotFOV = false, 200
-local HitboxEnabled, HitboxSize = false, 15
-local GodModeEnabled = false
-local InfiniteJumpEnabled = false
-local AutoHealEnabled = false
-local NoFallDamage = false
-local SkipDayEnabled = false
-local SelectedFilters = {}
+-- Frame chính
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 250, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
-local function isInFilter(name)
-    if #SelectedFilters == 0 then return true end
-    name = name:lower()
-    for _, f in ipairs(SelectedFilters) do
-        if name:find(f) then return true end
+-- Tiêu đề
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 40)
+titleLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+titleLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+titleLabel.Text = "GREEMOSS-by KING"
+titleLabel.TextSize = 18
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.Parent = mainFrame
+
+-- Hàm tạo nút
+local function createButton(parent, text, position)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -20, 0, 30)
+    button.Position = position
+    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text = text
+    button.Font = Enum.Font.SourceSans
+    button.TextSize = 14
+    button.Parent = parent
+    return button
+end
+
+-- Hàm tạo textbox
+local function createTextBox(parent, position, placeholder)
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(0.4, 0, 0, 25)
+    textBox.Position = position
+    textBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textBox.PlaceholderText = placeholder
+    textBox.Text = ""
+    textBox.Font = Enum.Font.SourceSans
+    textBox.TextSize = 14
+    textBox.Parent = parent
+    return textBox
+end
+
+-- ==========================================
+-- MỤC 1: COMBAT
+-- ==========================================
+
+-- Label Combat
+local combatLabel = Instance.new("TextLabel")
+combatLabel.Size = UDim2.new(1, 0, 0, 25)
+combatLabel.Position = UDim2.new(0, 0, 0, 45)
+combatLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+combatLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+combatLabel.Text = "COMBAT"
+combatLabel.TextSize = 16
+combatLabel.Font = Enum.Font.SourceSansBold
+combatLabel.Parent = mainFrame
+
+-- 1. AIMFOV
+local aimFovButton = createButton(mainFrame, "AimFov: OFF", UDim2.new(0, 10, 0, 75))
+local aimFovEnabled = false
+
+local aimFovTextBox = createTextBox(mainFrame, UDim2.new(0.55, 0, 0, 77), "Max 360")
+aimFovTextBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+
+-- Biến lưu giá trị FOV
+local aimFovValue = 360
+local targetPlayer = nil
+
+aimFovTextBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local value = tonumber(aimFovTextBox.Text)
+        if value and value > 0 and value <= 360 then
+            aimFovValue = value
+        else
+            aimFovTextBox.Text = ""
+            aimFovTextBox.PlaceholderText = "Max 360"
+        end
     end
+end)
+
+aimFovButton.MouseButton1Click:Connect(function()
+    aimFovEnabled = not aimFovEnabled
+    aimFovButton.Text = aimFovEnabled and "AimFov: ON" or "AimFov: OFF"
+    aimFovButton.BackgroundColor3 = aimFovEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- Hàm lấy người chơi gần nhất trong FOV
+local function getClosestPlayerInFov()
+    local closestPlayer = nil
+    local shortestDistance = aimFovValue
+    local camera = workspace.CurrentCamera
+    
+    if not camera then return nil end
+    
+    for _, v in pairs(players:GetPlayers()) do
+        if v ~= player and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local head = v.Character:FindFirstChild("Head")
+            if head then
+                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local mousePos = Vector2.new(mouse.X, mouse.Y)
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = v
+                    end
+                end
+            end
+        end
+    end
+    
+    return closestPlayer
+end
+
+-- 2. ĐÁNH LIÊN THANH
+local autoAttackButton = createButton(mainFrame, "Đánh Liên Thanh: OFF", UDim2.new(0, 10, 0, 115))
+local autoAttackEnabled = false
+
+autoAttackButton.MouseButton1Click:Connect(function()
+    autoAttackEnabled = not autoAttackEnabled
+    autoAttackButton.Text = autoAttackEnabled and "Đánh Liên Thanh: ON" or "Đánh Liên Thanh: OFF"
+    autoAttackButton.BackgroundColor3 = autoAttackEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- Hàm tấn công
+local function attackTarget(target)
+    if not target or not target.Character then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    -- Cố gắng sử dụng các tool/weapon có sẵn
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        -- Mô phỏng click để tấn công
+        local args = {
+            [1] = target.Character
+        }
+        
+        -- Thử các remote event phổ biến trong game Jujutsu
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        
+        -- Tìm kiếm và gọi remote attack
+        for _, remote in pairs(replicatedStorage:GetDescendants()) do
+            if remote:IsA("RemoteEvent") and (remote.Name:lower():find("attack") or remote.Name:lower():find("hit") or remote.Name:lower():find("combat")) then
+                pcall(function()
+                    remote:FireServer(unpack(args))
+                end)
+            end
+        end
+    end
+end
+
+-- 3. DODGE (TỰ ĐỘNG NÉ SKILL)
+local dodgeButton = createButton(mainFrame, "Dodge: OFF", UDim2.new(0, 10, 0, 155))
+local dodgeEnabled = false
+
+dodgeButton.MouseButton1Click:Connect(function()
+    dodgeEnabled = not dodgeEnabled
+    dodgeButton.Text = dodgeEnabled and "Dodge: ON" or "Dodge: OFF"
+    dodgeButton.BackgroundColor3 = dodgeEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- Biến lưu trạng thái dodge
+local lastDodgeTime = 0
+local dodgeCooldown = 2
+
+-- Hàm dodge
+local function performDodge()
+    local character = player.Character
+    if not character then return end
+    
+    local currentTime = tick()
+    if currentTime - lastDodgeTime < dodgeCooldown then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoid and rootPart then
+        -- Tạo hướng dodge ngẫu nhiên
+        local dodgeDirection = Vector3.new(math.random(-1, 1), 0, math.random(-1, 1)).Unit
+        local dodgeForce = dodgeDirection * 50
+        
+        -- Áp dụng dodge
+        rootPart.Velocity = rootPart.Velocity + dodgeForce
+        
+        -- Gọi remote dodge nếu có
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        for _, remote in pairs(replicatedStorage:GetDescendants()) do
+            if remote:IsA("RemoteEvent") and (remote.Name:lower():find("dodge") or remote.Name:lower():find("dash") or remote.Name:lower():find("evade")) then
+                pcall(function()
+                    remote:FireServer()
+                end)
+            end
+        end
+        
+        lastDodgeTime = currentTime
+    end
+end
+
+-- Hàm phát hiện skill đang bay tới
+local function isSkillIncoming()
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local rootPart = character.HumanoidRootPart
+    
+    -- Quét các object có thể là skill (projectile, effect, etc)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Velocity.Magnitude > 10 then
+            -- Kiểm tra xem object có đang bay về phía người chơi không
+            local toObject = (obj.Position - rootPart.Position).Unit
+            local objectDirection = obj.Velocity.Unit
+            
+            -- Nếu object đang di chuyển về phía người chơi
+            local dotProduct = toObject:Dot(objectDirection)
+            if dotProduct < -0.3 then
+                local distance = (obj.Position - rootPart.Position).Magnitude
+                if distance < 30 then -- Trong phạm vi 30 studs
+                    return true
+                end
+            end
+        end
+    end
+    
     return false
 end
 
--- ==================== TẠO TABS ====================
-local TabESP = Window:CreateTab("ESP", 4483362458)
-local TabCombat = Window:CreateTab("Chiến đấu", 4483362458)
-local TabMove = Window:CreateTab("Chuyển động", 4483362458)
-local TabPickup = Window:CreateTab("Lấy Đồ", 4483362458)
-local TabFarm = Window:CreateTab("Auto Farm", 4483362458)
-local TabMisc = Window:CreateTab("Misc", 4483362458)
-
--- ==================== ESP ====================
-TabESP:CreateSection("ESP")
-TabESP:CreateToggle({Name = "Player ESP", CurrentValue = true, Callback = function(v) print("Player ESP:", v) end})
-TabESP:CreateToggle({Name = "Zombie ESP", CurrentValue = true, Callback = function(v) print("Zombie ESP:", v) end})
-TabESP:CreateToggle({Name = "Item ESP", CurrentValue = true, Callback = function(v) print("Item ESP:", v) end})
-TabESP:CreateToggle({Name = "Box + Health", CurrentValue = true, Callback = function(v) print("Box:", v) end})
-TabESP:CreateToggle({Name = "Tracers", CurrentValue = true, Callback = function(v) print("Tracers:", v) end})
-
--- ==================== CHIẾN ĐẤU ====================
-TabCombat:CreateSection("Combat")
-TabCombat:CreateToggle({Name = "Aimbot Silent", CurrentValue = false, Callback = function(v) AimbotEnabled = v end})
-TabCombat:CreateSlider({Name = "Aimbot FOV", Range = {50, 900}, Increment = 10, CurrentValue = 200, Callback = function(v) AimbotFOV = v end})
-
-TabCombat:CreateToggle({Name = "Kill Aura", CurrentValue = false, Callback = function(v) KillAuraEnabled = v end})
-TabCombat:CreateSlider({Name = "Kill Aura Range", Range = {5, 60}, Increment = 1, CurrentValue = 20, Callback = function(v) KillAuraRange = v end})
-TabCombat:CreateSlider({Name = "Kill Aura Damage", Range = {10, 100}, Increment = 5, CurrentValue = 40, Callback = function(v) KillAuraDamage = v end})
-
-TabCombat:CreateToggle({Name = "Hitbox Expander", CurrentValue = false, Callback = function(v) HitboxEnabled = v end})
-TabCombat:CreateSlider({Name = "Hitbox Size", Range = {5, 50}, Increment = 1, CurrentValue = 15, Callback = function(v) HitboxSize = v end})
-
-TabCombat:CreateToggle({Name = "God Mode", CurrentValue = false, Callback = function(v) GodModeEnabled = v end})
-
--- ==================== CHUYỂN ĐỘNG ====================
-TabMove:CreateSection("Movement")
-TabMove:CreateToggle({Name = "Fly", CurrentValue = false, Callback = function(v) FlyEnabled = v end})
-TabMove:CreateSlider({Name = "Fly Speed", Range = {20, 500}, Increment = 5, CurrentValue = 80, Callback = function(v) FlySpeed = v end})
-
-TabMove:CreateToggle({Name = "Noclip", CurrentValue = false, Callback = function(v) NoclipEnabled = v end})
-TabMove:CreateToggle({Name = "Speed Hack", CurrentValue = false, Callback = function(v) SpeedEnabled = v end})
-TabMove:CreateSlider({Name = "WalkSpeed", Range = {16, 250}, Increment = 1, CurrentValue = 45, Callback = function(v) WalkSpeedValue = v end})
-TabMove:CreateToggle({Name = "Infinite Jump", CurrentValue = false, Callback = function(v) InfiniteJumpEnabled = v end})
-TabMove:CreateToggle({Name = "No Fall Damage", CurrentValue = false, Callback = function(v) NoFallDamage = v end})
-
--- ==================== LẤY ĐỒ ====================
-TabPickup:CreateSection("Auto Pickup")
-TabPickup:CreateToggle({Name = "Bật Auto Pickup", CurrentValue = false, Callback = function(v) AutoPickupEnabled = v end})
-TabPickup:CreateSlider({Name = "Delay (giây)", Range = {0.01, 0.15}, Increment = 0.01, CurrentValue = 0.025, Callback = function(v) PickupDelay = v end})
-TabPickup:CreateSlider({Name = "Khoảng cách", Range = {10, 80}, Increment = 1, CurrentValue = 35, Callback = function(v) MaxPickupDistance = v end})
-
-TabPickup:CreateSection("Filter Đồ")
-TabPickup:CreateToggle({Name = "Vũ khí", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"gun") table.insert(SelectedFilters,"weapon") end end})
-TabPickup:CreateToggle({Name = "Thức ăn / Nước", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"food") table.insert(SelectedFilters,"water") end end})
-TabPickup:CreateToggle({Name = "Đạn", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"ammo") end end})
-TabPickup:CreateToggle({Name = "Vật liệu / Tool", CurrentValue = false, Callback = function(v) if v then table.insert(SelectedFilters,"material") table.insert(SelectedFilters,"tool") end end})
-
--- ==================== AUTO FARM ====================
-TabFarm:CreateSection("Auto Farm")
-TabFarm:CreateToggle({Name = "Auto Farm Quái", CurrentValue = false, Callback = function(v) print("Auto Farm:", v) end})
-TabFarm:CreateToggle({Name = "Auto Heal", CurrentValue = false, Callback = function(v) AutoHealEnabled = v end})
-
--- ==================== MISC + SKIP DAY ====================
-TabMisc:CreateSection("Misc")
-TabMisc:CreateToggle({Name = "Skip Day (Trời sáng ngay)", CurrentValue = false, Callback = function(v)
-    SkipDayEnabled = v
-    if v then
-        Lighting.ClockTime = 14
-        Lighting.Brightness = 3
-        Lighting.FogEnd = 999999
-        print("🌞 Skip Day Activated")
-    end
-end})
-
-TabMisc:CreateButton({Name = "Force Skip Day", Callback = function()
-    Lighting.ClockTime = 14
-    Lighting.Brightness = 3
-    Lighting.FogEnd = 999999
-    Rayfield:Notify({Title = "Skip Day", Content = "Trời đã được buộc sáng!", Duration = 5})
-end})
-
-TabMisc:CreateToggle({Name = "Fullbright", CurrentValue = true, Callback = function(v) 
-    if v then 
-        Lighting.Brightness = 3 
-        Lighting.FogEnd = 999999 
-    end 
-end})
-
-TabMisc:CreateToggle({Name = "Anti AFK", CurrentValue = true, Callback = function() end})
-TabMisc:CreateButton({Name = "Rejoin Server", Callback = function() 
-    game:GetService("TeleportService"):Teleport(game.PlaceId) 
-end})
-
--- ==================== NOTIFY ====================
-Rayfield:Notify({
-   Title = "BAVOHUB",
-   Content = "Menu đã load xong!\nBật Skip Day khi trời tối để chuyển sáng ngay.",
-   Duration = 8
-})
-
-print("✅ BAVOHUB loaded!")
-
--- ==================== LOGIC CHẠY ====================
-
-RunService.Heartbeat:Connect(function()
-    local char = lp.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChild("Humanoid")
-    if not root or not hum then return end
-
-    -- Speed Hack
-    if SpeedEnabled then 
-        hum.WalkSpeed = WalkSpeedValue 
-    else 
-        hum.WalkSpeed = 16 
-    end
-
-    -- Fly
-    if FlyEnabled and root then
-        local move = Vector3.new()
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
-        if move.Magnitude > 0 then root.Velocity = move.Unit * FlySpeed end
-    end
-
-    -- Noclip
-    if NoclipEnabled then
-        for _, p in pairs(char:GetDescendants()) do
-            if p:IsA("BasePart") then p.CanCollide = false end
-        end
-    end
-
-    -- God Mode
-    if GodModeEnabled and hum then 
-        hum.Health = hum.MaxHealth 
-    end
-
-    -- Infinite Jump
-    if InfiniteJumpEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-        hum:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-
-    -- No Fall Damage
-    if NoFallDamage and hum:GetState() == Enum.HumanoidStateType.Freefall then
-        hum:ChangeState(Enum.HumanoidStateType.Landed)
-    end
-
-    -- Skip Day
-    if SkipDayEnabled then
-        Lighting.ClockTime = 14
-        Lighting.Brightness = 3
-    end
-end)
-
--- Auto Pickup
-local lastPickup = 0
-RunService.Heartbeat:Connect(function()
-    if not AutoPickupEnabled or tick() - lastPickup < PickupDelay then return end
-    local char = lp.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local rootPos = char.HumanoidRootPart.Position
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") and obj.Enabled and obj.Parent then
-            local dist = (obj.Parent.Position - rootPos).Magnitude
-            if dist <= MaxPickupDistance and isInFilter(obj.Parent.Name) then
-                pcall(function() fireproximityprompt(obj) end)
+-- Main loop
+runService.RenderStepped:Connect(function()
+    -- AimFov
+    if aimFovEnabled then
+        local closest = getClosestPlayerInFov()
+        if closest and closest.Character and closest.Character:FindFirstChild("Head") then
+            local camera = workspace.CurrentCamera
+            if camera then
+                camera.CFrame = CFrame.new(camera.CFrame.Position, closest.Character.Head.Position)
             end
         end
     end
-    lastPickup = tick()
-end)
-
--- Kill Aura
-RunService.Heartbeat:Connect(function()
-    if not KillAuraEnabled then return end
-    local char = lp.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local rootPos = char.HumanoidRootPart.Position
-
-    for _, mob in ipairs(workspace:GetDescendants()) do
-        if mob:FindFirstChild("Humanoid") and mob:FindFirstChild("HumanoidRootPart") and mob \~= char then
-            if (mob.HumanoidRootPart.Position - rootPos).Magnitude <= KillAuraRange then
-                pcall(function() mob.Humanoid:TakeDamage(KillAuraDamage) end)
-            end
+    
+    -- Auto Attack
+    if autoAttackEnabled then
+        local target = getClosestPlayerInFov()
+        if target then
+            attackTarget(target)
+        end
+    end
+    
+    -- Dodge
+    if dodgeEnabled then
+        if isSkillIncoming() then
+            performDodge()
         end
     end
 end)
 
--- Hitbox Expander
-RunService.Heartbeat:Connect(function()
-    if not HitboxEnabled then return end
-    for _, mob in ipairs(workspace:GetDescendants()) do
-        if mob:FindFirstChild("Humanoid") and mob:FindFirstChild("HumanoidRootPart") and mob \~= lp.Character then
-            local r = mob.HumanoidRootPart
-            r.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
-            r.Transparency = 0.5
-            r.CanCollide = false
-        end
-    end
+-- Hiệu ứng đóng/mở GUI
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 50, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.fromRGB(0, 255, 0)
+toggleButton.Text = "GREEMOSS"
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 12
+toggleButton.Parent = screenGui
+
+local guiVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+    guiVisible = not guiVisible
+    mainFrame.Visible = guiVisible
 end)
 
-print("🚀 BAVOHUB sẵn sàng sử dụng!")
+-- Thông báo script đã load
+print("GREEMOSS-by KING - Script đã được load thành công!")
+print("Chức năng:")
+print("- AimFov: Tự động ngắm mục tiêu trong FOV")
+print("- Đánh Liên Thanh: Tấn công liên tục không delay")
+print("- Dodge: Tự động né skill đang bay tới")
